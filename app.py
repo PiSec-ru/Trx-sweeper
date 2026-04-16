@@ -6,11 +6,9 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# ========== ТЕСТОВЫЙ КОШЕЛЁК ==========
 PRIVATE_KEY = '2fd79529ed4481bd34542f84df7c220f9da519f1c09dbbe31d0d85c067ff188e'
 FROM_ADDRESS = 'TAPCUcxYN6aGGaPHnVp2RWB6CvMGicKDBX'
 TO_ADDRESS = 'TVBSzwaKLEwUmdCXUCyaCbZGgsbdBR8LLn'
-# ======================================
 
 API_URL = 'https://api.trongrid.io'
 
@@ -32,10 +30,11 @@ def get_balance():
 def send_trx(amount_sun):
     try:
         print(f"Attempting to send {amount_sun} SUN")
+        
         owner_hex = b58_to_hex(FROM_ADDRESS)
         to_hex = b58_to_hex(TO_ADDRESS)
         
-        # 1. Создаём транзакцию
+        # Создаём транзакцию
         tx_data = {"owner_address": owner_hex, "to_address": to_hex, "amount": amount_sun}
         create = requests.post(f'{API_URL}/wallet/createtransaction', json=tx_data)
         tx = create.json()
@@ -43,40 +42,25 @@ def send_trx(amount_sun):
             print(f"Create error: {tx}")
             return False
         
-        # 2. Получаем последний блок (безопасно)
+        # Получаем последний блок
         block = requests.post(f'{API_URL}/wallet/getnowblock').json()
-        
-        # Извлекаем номер блока
-        if 'block_header' in block and 'raw_data' in block['block_header']:
-            num = block['block_header']['raw_data']['number']
-        else:
-            num = int(time.time())
-        
+        num = block['block_header']['raw_data']['number']
         ref_block_bytes = hex(num)[2:].zfill(8)[-8:]
-        
-        # Извлекаем хеш блока (безопасно)
-        if 'blockid' in block:
-            ref_block_hash = block['blockid'][:16]
-        elif 'blockID' in block:
-            ref_block_hash = block['blockID'][:16]
-        else:
-            # Если нет blockid, используем заглушку
-            ref_block_hash = '0' * 16
+        ref_block_hash = block['blockid'][:16]
         
         tx['ref_block_bytes'] = ref_block_bytes
         tx['ref_block_hash'] = ref_block_hash
         tx['timestamp'] = int(time.time() * 1000)
         
-        # 3. Подписываем транзакцию (локально, без API)
-        from tronapi import Tron
-        tron = Tron()
-        tron.private_key = PRIVATE_KEY
-        tron.default_address = FROM_ADDRESS
+        # Подписываем через API (да, это работает)
+        sign_data = {"transaction": tx, "privateKey": PRIVATE_KEY}
+        signed = requests.post(f'{API_URL}/wallet/gettransactionsign', json=sign_data).json()
+        if 'Error' in signed:
+            print(f"Sign error: {signed}")
+            return False
         
-        signed_tx = tron.transaction.sign(tx)
-        
-        # 4. Отправляем
-        result = requests.post(f'{API_URL}/wallet/broadcasttransaction', json=signed_tx).json()
+        # Отправляем
+        result = requests.post(f'{API_URL}/wallet/broadcasttransaction', json=signed).json()
         print(f"Broadcast result: {result}")
         return result.get('result', False)
         
