@@ -2,3 +2,4 @@ requests
 base58
 flask
 gunicorn
+tronapi
