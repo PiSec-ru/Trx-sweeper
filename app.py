@@ -24,17 +24,63 @@ def get_balance():
             return data['data'][0].get('balance', 0)
         return 0
     except Exception as e:
+        print(f"Balance error: {e}")
         return 0
+
+def send_trx(amount_sun):
+    try:
+        print(f"Attempting to send {amount_sun} SUN")
+        owner_hex = b58_to_hex(FROM_ADDRESS)
+        to_hex = b58_to_hex(TO_ADDRESS)
+        
+        tx_data = {"owner_address": owner_hex, "to_address": to_hex, "amount": amount_sun}
+        create = requests.post(f'{API_URL}/wallet/createtransaction', json=tx_data)
+        tx = create.json()
+        if 'Error' in tx:
+            print(f"Create error: {tx}")
+            return False
+        
+        block = requests.post(f'{API_URL}/wallet/getnowblock').json()
+        num = block['block_header']['raw_data']['number']
+        ref_block_bytes = hex(num)[2:].zfill(8)[-8:]
+        ref_block_hash = block['blockid'][:16]
+        
+        tx['ref_block_bytes'] = ref_block_bytes
+        tx['ref_block_hash'] = ref_block_hash
+        tx['timestamp'] = int(time.time() * 1000)
+        
+        sign_data = {"transaction": tx, "privateKey": PRIVATE_KEY}
+        signed = requests.post(f'{API_URL}/wallet/gettransactionsign', json=sign_data).json()
+        if 'Error' in signed:
+            print(f"Sign error: {signed}")
+            return False
+        
+        result = requests.post(f'{API_URL}/wallet/broadcasttransaction', json=signed).json()
+        print(f"Broadcast result: {result}")
+        return result.get('result', False)
+    except Exception as e:
+        print(f"Send error: {e}")
+        return False
 
 @app.route('/')
 def index():
-    return 'TRX Sweeper (TEST MODE) is running!'
+    return 'TRX Sweeper is running!'
 
 @app.route('/check')
 def check():
     balance = get_balance()
     balance_trx = balance / 1_000_000
-    return f'Balance: {balance_trx:.2f} TRX'
+    
+    if balance > 5_000_000:
+        amount = balance - 1_500_000
+        amount_trx = amount / 1_000_000
+        success = send_trx(amount)
+        if success:
+            return f'✅ Sent {amount_trx:.2f} TRX from {balance_trx:.2f} TRX'
+        else:
+            return f'❌ Send failed. Check logs. Balance: {balance_trx:.2f} TRX'
+    
+    return f'Balance: {balance_trx:.2f} TRX (below 5 TRX threshold)'
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
