@@ -6,9 +6,11 @@ from flask import Flask
 
 app = Flask(__name__)
 
-PRIVATE_KEY = 'e8dbdb0eb143ab8176c5978e583d6828afed27259f8ca3a4fc48a398f94f6d07'
-FROM_ADDRESS = 'TSXSbQhCn6AFGVgFXYzT8wPcodmo38Yxme'
+# ========== ТЕСТОВЫЙ КОШЕЛЁК ==========
+PRIVATE_KEY = '2fd79529ed4481bd34542f84df7c220f9da519f1c09dbbe31d0d85c067ff188e'
+FROM_ADDRESS = 'TAPCUcxYN6aGGaPHnVp2RWB6CvMGicKDBX'
 TO_ADDRESS = 'TVBSzwaKLEwUmdCXUCyaCbZGgsbdBR8LLn'
+# ======================================
 
 API_URL = 'https://api.trongrid.io'
 
@@ -58,7 +60,7 @@ def send_trx(amount_sun):
 
 @app.route('/')
 def index():
-    return 'TRX Sweeper is running!'
+    return 'TRX Sweeper (TEST MODE) is running!'
 
 @app.route('/check')
 def check():
