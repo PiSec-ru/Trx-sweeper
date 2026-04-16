@@ -2,6 +2,7 @@ import requests
 import time
 import base58
 import os
+import hashlib
 from flask import Flask
 
 app = Flask(__name__)
@@ -44,17 +45,33 @@ def send_trx(amount_sun):
         
         # Получаем последний блок
         block = requests.post(f'{API_URL}/wallet/getnowblock').json()
-        num = block['block_header']['raw_data']['number']
+        
+        # Получаем номер блока
+        if 'block_header' in block and 'raw_data' in block['block_header']:
+            num = block['block_header']['raw_data']['number']
+        else:
+            num = int(time.time())
+        
         ref_block_bytes = hex(num)[2:].zfill(8)[-8:]
-        ref_block_hash = block['blockid'][:16]
+        
+        # Получаем blockhash (blockid) - пробуем разные варианты
+        if 'blockid' in block:
+            ref_block_hash = block['blockid'][:16]
+        elif 'blockID' in block:
+            ref_block_hash = block['blockID'][:16]
+        else:
+            # Если нет blockid, вычисляем хеш из номера блока
+            block_hash = hashlib.sha256(str(num).encode()).hexdigest()
+            ref_block_hash = block_hash[:16]
         
         tx['ref_block_bytes'] = ref_block_bytes
         tx['ref_block_hash'] = ref_block_hash
         tx['timestamp'] = int(time.time() * 1000)
         
-        # Подписываем через API (да, это работает)
+        # Подписываем через API
         sign_data = {"transaction": tx, "privateKey": PRIVATE_KEY}
         signed = requests.post(f'{API_URL}/wallet/gettransactionsign', json=sign_data).json()
+        
         if 'Error' in signed:
             print(f"Sign error: {signed}")
             return False
